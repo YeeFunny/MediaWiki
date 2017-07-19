@@ -8,27 +8,34 @@ import java.util.regex.Pattern;
 
 public class HtmlUtil {
 	
+	private Pattern pattern;
+	private Matcher matcher;
+	
 	public Map<String, String> addHtmlTag (Map<String, String> queryResult) {
 		for (Map.Entry<String, String> entry: queryResult.entrySet()) {
 			String id = entry.getKey();
 			String text = entry.getValue();
-			Pattern pattern = Pattern.compile("[^\\S\n]*\n");
-			Matcher matcher = pattern.matcher(text);
+			pattern = Pattern.compile("[^\\S\n]*[\n]");
+			matcher = pattern.matcher(text);
 			while (matcher.find()) {
 				text = matcher.replaceAll("<br />");
 			}
-			text = escapeQuote(text);
+			text = escapeQuoteSpace(text);
 			queryResult.replace(id, text);
 		}
 		return queryResult;
 	}
 	
-	private String escapeQuote (String entry) {
+	private String escapeQuoteSpace (String entry) {
 		String[] quotes = {"\"", "'"};
 		for (String quote: quotes) {
 			if (entry.contains(quote))
 				entry = entry.replace(quote, "\\" + quote);
 		}
+		entry = entry.replaceAll("\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
+		pattern = Pattern.compile(" (?= |&nbsp;)|(?<= |&nbsp;) ");
+		matcher = pattern.matcher(entry);
+		entry = matcher.replaceAll("&nbsp;");
 		return entry;
 	}
 	

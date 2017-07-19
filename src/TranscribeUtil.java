@@ -2,7 +2,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class TranscribeUtil {
@@ -12,23 +14,106 @@ public class TranscribeUtil {
 	private PreparedStatement preparedStatement = null;
 	private ResultSet resultSet = null;
 	
-	public Map<String, String> getTextContent () {
+	private Map<Integer, List<Integer>> getIdsOfFileEntry () {
+		List<Integer> fileIds = new ArrayList<Integer>();
+		Map<Integer, List<Integer>> fileEntryIds = new HashMap<Integer, List<Integer>>();
+		conn = mysqlUtil.getConnection("transcribe");
+		try {
+			preparedStatement = conn
+					.prepareStatement("select f.item_id, e.record_id from element_texts e inner join files f on e.record_id = f.id " + 
+									  "where e.element_id = '86' and e.record_type = 'File' and f.item_id != '3' order by f.item_id;");
+			resultSet = preparedStatement.executeQuery();
+			int itemId = 0;
+			while (resultSet.first()) {
+				if (itemId == 0) {
+					itemId = resultSet.getInt(1);
+					fileIds.add(resultSet.getInt(2));
+				}
+				else if (itemId != resultSet.getInt(1)) {
+					List<Integer> newFileIds = new ArrayList<Integer>(fileIds);
+					fileEntryIds.put(itemId, newFileIds);
+					itemId = resultSet.getInt(1);
+					fileIds.clear();
+					fileIds.add(resultSet.getInt(2));
+				}
+				else {
+					fileIds.add(resultSet.getInt(2));
+				}
+				resultSet.deleteRow();
+			}
+		} catch (SQLException sqlException) {
+			sqlException.printStackTrace();
+		} finally {
+			mysqlUtil.close();
+		}
+		return fileEntryIds;
+	}
+	
+	private List<Integer> getFileIdsOfItem (int itemId) {
+		List<Integer> fileIds = new ArrayList<Integer>();
+		conn = mysqlUtil.getConnection("transcribe");
+		try {
+			preparedStatement = conn
+					.prepareStatement("select id from files where item_id = ?;");
+			preparedStatement.setInt(1, itemId);
+			resultSet = preparedStatement.executeQuery();
+			while (resultSet.next()) 
+				fileIds.add(resultSet.getInt("id"));
+		} catch (SQLException sqlException) {
+			sqlException.printStackTrace();
+		} finally {
+			mysqlUtil.close();
+		}
+		return fileIds;
+	}
+	
+	private int getItemFileNum (int itemId) {
+		int fileNum = 0;
+		conn = mysqlUtil.getConnection("transcribe");
+		try {
+			preparedStatement = conn.prepareStatement("select count(*) from files where item_id = ?;");
+			preparedStatement.setInt(1, itemId);
+			resultSet = preparedStatement.executeQuery();
+			while (resultSet.next())
+				fileNum = resultSet.getInt(1);
+		} catch (SQLException sqlException) {
+			sqlException.printStackTrace();
+		}
+		return fileNum;
+	}
+	
+	public Map<String, String> getTextContentOfFile () {
+		Map<String, String> recordText = new HashMap<String, String>();
+		
+		return recordText;
+	}
+	
+	public void justTest () {
+		Map<Integer, List<Integer>> fileEntryIds = getIdsOfFileEntry();
+		for (Map.Entry<Integer, List<Integer>> entry : fileEntryIds.entrySet()) {
+			int itemId = entry.getKey();
+			List<Integer> fileIds = entry.getValue();
+			int fileNum = getItemFileNum(itemId);
+			if (fileIds.size() == fileNum)
+				System.out.println(itemId);
+		}
+	}
+	
+	public Map<String, String> getTextContentOfItem () {
 		Map<String, String> recordText = new HashMap<String, String>();
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
 			preparedStatement = conn
 					.prepareStatement("select a.record_id as item_id, b.id as file_id, a.text as text " + 
 									  "from element_texts a inner join files b on a.record_id = b.item_id " +
-									  "where a.element_id = '86' and a.record_type = 'item' and character_length(a.text) >= 500;");
+									  "where a.element_id = '86' and a.record_type = 'item' and a.record_id != '3'" + 
+									  "and character_length(a.text) >= 500;");
 			resultSet = preparedStatement.executeQuery();
 			
-			while (resultSet.next()) {
-				int itemId = resultSet.getInt("item_id");
-				int fileId = resultSet.getInt("file_id");
-				String text = resultSet.getString("text");
-				if (text.length() >= 500)
-					recordText.put(itemId + "_" + fileId, text);
-			}
+			while (resultSet.next())
+				recordText.put(resultSet.getInt("item_id") + "_" + resultSet.getInt("file_id")
+					, resultSet.getString("text").trim());
+			
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
 		} finally {

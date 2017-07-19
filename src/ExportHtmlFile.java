@@ -9,10 +9,10 @@ public class ExportHtmlFile {
 		TranscribeUtil transcribeUtil = new TranscribeUtil();
 		HtmlUtil htmlUtil = new HtmlUtil();
 		
-		Map<String, String> queryResult = transcribeUtil.getTextContent();
-		transcribeUtil.updateFileTranscription(queryResult);
+		Map<String, String> queryResult = transcribeUtil.getTextContentOfItem();
 		
 		queryResult = htmlUtil.addHtmlTag(queryResult);
+		
 		htmlUtil.exportHtmlFile(queryResult, targetDir);
 	}
 
