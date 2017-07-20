@@ -74,4 +74,9 @@ public class DecodeUtil {
 			mysqlUtil.close();
 		}
 	}
+	
+	public static void main(String[] args) {
+		DecodeUtil decodeUtil = new DecodeUtil();
+		decodeUtil.decodeWindowsCode();
+	}
 }

@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -25,19 +26,33 @@ public class TranscribeUtil {
 	}
 	
 	private List<Item> getItemHavingFileEntry () {
+		itemList = new ArrayList<Item>();
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
 			preparedStatement = conn
-					.prepareStatement("select f.item_id, e.record_id from element_texts e inner join files f on e.record_id = f.id " + 
+					.prepareStatement("select f.item_id, e.record_id, e.text from element_texts e inner join files f on e.record_id = f.id " + 
 									  "where e.element_id = '86' and e.record_type = 'File' and f.item_id != '3' order by f.item_id;");
 			resultSet = preparedStatement.executeQuery();
 			while (resultSet.next()) {
 				file = new File(resultSet.getInt(2));
-				if (item.getItemId() != resultSet.getInt(1))
+				file.setText(resultSet.getString(3).trim());
+				if (item == null) {
+					item = new Item(resultSet.getInt(1));
 					fileList = new ArrayList<File>();
-				else {
+				} else if (resultSet.isLast()) {
 					fileList.add(file);
+					item.setFiles(fileList);
+					itemList.add(item);
+					break;
 				}
+				if (item.getItemId() != resultSet.getInt(1)) {
+					item.setFiles(fileList);
+					itemList.add(item);
+					item = new Item(resultSet.getInt(1));
+					fileList = new ArrayList<File>();;
+				}
+				
+				fileList.add(file);
 			}
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
@@ -51,8 +66,7 @@ public class TranscribeUtil {
 		List<Integer> fileIds = new ArrayList<Integer>();
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
-			preparedStatement = conn
-					.prepareStatement("select id from files where item_id = ?;");
+			preparedStatement = conn.prepareStatement("select id from files where item_id = ?;");
 			preparedStatement.setInt(1, itemId);
 			resultSet = preparedStatement.executeQuery();
 			while (resultSet.next()) 
@@ -65,25 +79,25 @@ public class TranscribeUtil {
 		return fileIds;
 	}
 	
-	private int getItemFileNum (int itemId) {
-		int fileNum = 0;
-		conn = mysqlUtil.getConnection("transcribe");
-		try {
-			preparedStatement = conn.prepareStatement("select count(*) from files where item_id = ?;");
-			preparedStatement.setInt(1, itemId);
-			resultSet = preparedStatement.executeQuery();
-			while (resultSet.next())
-				fileNum = resultSet.getInt(1);
-		} catch (SQLException sqlException) {
-			sqlException.printStackTrace();
+	public void justTest() {
+		itemList = getItemHavingFileEntry();
+		Iterator<Item> iterator = itemList.iterator();
+		while (iterator.hasNext()) {
+			item = iterator.next();
+			System.out.print(item.getItemId() + "|");
+			List<Integer> fileIds = getFileIdsOfItem(item.getItemId());
+			for (int i = 0; i < fileIds.size(); i++) {
+				file = new File(fileIds.get(i));
+				if (!item.getFiles().contains(file)) {
+					iterator.remove();
+					break;
+				}
+			}
 		}
-		return fileNum;
-	}
-	
-	public Map<String, String> getTextContentOfFile () {
-		Map<String, String> recordText = new HashMap<String, String>();
-		
-		return recordText;
+		System.out.println("---------------------------------------------");
+		for (int i = 0; i < itemList.size(); i++) {
+			System.out.print(itemList.get(i).getItemId() + "|");
+		}
 	}
 	
 	public Map<String, String> getTextContentOfItem () {
