@@ -1,3 +1,4 @@
+package edu.wm.library.lyf;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,44 +10,41 @@ import java.util.Map;
 
 public class TranscribeUtil {
 	
-	private MysqlUtil mysqlUtil = new MysqlUtil();
+	private MysqlUtil mysqlUtil;
 	private Connection conn = null;
 	private PreparedStatement preparedStatement = null;
 	private ResultSet resultSet = null;
 	
-	private Map<Integer, List<Integer>> getIdsOfFileEntry () {
-		List<Integer> fileIds = new ArrayList<Integer>();
-		Map<Integer, List<Integer>> fileEntryIds = new HashMap<Integer, List<Integer>>();
+	private List<Item> itemList;
+	private List<File> fileList;
+	private Item item;
+	private File file;
+	
+	public TranscribeUtil () {
+		this.mysqlUtil = new MysqlUtil();
+	}
+	
+	private List<Item> getItemHavingFileEntry () {
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
 			preparedStatement = conn
 					.prepareStatement("select f.item_id, e.record_id from element_texts e inner join files f on e.record_id = f.id " + 
 									  "where e.element_id = '86' and e.record_type = 'File' and f.item_id != '3' order by f.item_id;");
 			resultSet = preparedStatement.executeQuery();
-			int itemId = 0;
-			while (resultSet.first()) {
-				if (itemId == 0) {
-					itemId = resultSet.getInt(1);
-					fileIds.add(resultSet.getInt(2));
-				}
-				else if (itemId != resultSet.getInt(1)) {
-					List<Integer> newFileIds = new ArrayList<Integer>(fileIds);
-					fileEntryIds.put(itemId, newFileIds);
-					itemId = resultSet.getInt(1);
-					fileIds.clear();
-					fileIds.add(resultSet.getInt(2));
-				}
+			while (resultSet.next()) {
+				file = new File(resultSet.getInt(2));
+				if (item.getItemId() != resultSet.getInt(1))
+					fileList = new ArrayList<File>();
 				else {
-					fileIds.add(resultSet.getInt(2));
+					fileList.add(file);
 				}
-				resultSet.deleteRow();
 			}
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
 		} finally {
 			mysqlUtil.close();
 		}
-		return fileEntryIds;
+		return itemList;
 	}
 	
 	private List<Integer> getFileIdsOfItem (int itemId) {
@@ -86,17 +84,6 @@ public class TranscribeUtil {
 		Map<String, String> recordText = new HashMap<String, String>();
 		
 		return recordText;
-	}
-	
-	public void justTest () {
-		Map<Integer, List<Integer>> fileEntryIds = getIdsOfFileEntry();
-		for (Map.Entry<Integer, List<Integer>> entry : fileEntryIds.entrySet()) {
-			int itemId = entry.getKey();
-			List<Integer> fileIds = entry.getValue();
-			int fileNum = getItemFileNum(itemId);
-			if (fileIds.size() == fileNum)
-				System.out.println(itemId);
-		}
 	}
 	
 	public Map<String, String> getTextContentOfItem () {

@@ -1,3 +1,4 @@
+package edu.wm.library.lyf;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,17 @@ public class HtmlUtil {
 		return queryResult;
 	}
 	
+	public void exportHtmlFile (Map<String, String> queryResult, String targetDir) {
+		for (Map.Entry<String, String> entry: queryResult.entrySet()) {
+			Path file = Paths.get(targetDir + entry.getKey() + ".txt");
+			try {
+				Files.write(file, entry.getValue().getBytes());
+			} catch (IOException ioException) {
+				ioException.printStackTrace();
+			}
+		}
+	}
+	
 	private String escapeQuoteSpace (String entry) {
 		String[] quotes = {"\"", "'"};
 		for (String quote: quotes) {
@@ -37,16 +49,5 @@ public class HtmlUtil {
 		matcher = pattern.matcher(entry);
 		entry = matcher.replaceAll("&nbsp;");
 		return entry;
-	}
-	
-	public void exportHtmlFile (Map<String, String> queryResult, String targetDir) {
-		for (Map.Entry<String, String> entry: queryResult.entrySet()) {
-			Path file = Paths.get(targetDir + entry.getKey() + ".txt");
-			try {
-				Files.write(file, entry.getValue().getBytes());
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
-			}
-		}
 	}
 }
