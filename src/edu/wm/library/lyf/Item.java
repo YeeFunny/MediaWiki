@@ -5,6 +5,7 @@ import java.util.List;
 public class Item {
 	private int itemId;
 	private List<File> files;
+	private boolean exist;
 	
 	public Item(int itemId) {
 		this.itemId = itemId;
@@ -20,5 +21,11 @@ public class Item {
 	}
 	public void setItemId(int itemId) {
 		this.itemId = itemId;
+	}
+	@Override
+	public boolean equals(Object object) {
+		if (object != null && object instanceof Item)
+			exist = this.itemId == ((Item)object).itemId;
+		return exist;
 	}
 }

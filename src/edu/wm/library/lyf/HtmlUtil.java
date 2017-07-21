@@ -3,7 +3,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,28 +12,27 @@ public class HtmlUtil {
 	private Pattern pattern;
 	private Matcher matcher;
 	
-	public Map<String, String> addHtmlTag (Map<String, String> queryResult) {
-		for (Map.Entry<String, String> entry: queryResult.entrySet()) {
-			String id = entry.getKey();
-			String text = entry.getValue();
-			pattern = Pattern.compile("[^\\S\n]*[\n]");
-			matcher = pattern.matcher(text);
-			while (matcher.find()) {
-				text = matcher.replaceAll("<br />");
-			}
-			text = escapeQuoteSpace(text);
-			queryResult.replace(id, text);
+	public String addHtmlTag (String text) {
+		pattern = Pattern.compile("[^\\S\n]*[\n]");
+		matcher = pattern.matcher(text);
+		while (matcher.find()) {
+			text = matcher.replaceAll("<br />");
 		}
-		return queryResult;
+		text = escapeQuoteSpace(text);
+		return text;
 	}
 	
-	public void exportHtmlFile (Map<String, String> queryResult, String targetDir) {
-		for (Map.Entry<String, String> entry: queryResult.entrySet()) {
-			Path file = Paths.get(targetDir + entry.getKey() + ".txt");
-			try {
-				Files.write(file, entry.getValue().getBytes());
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
+	public void exportHtmlFile (List<Item> itemList, String targetDir) {
+		for (int i = 0; i < itemList.size(); i++) {
+			Item item = itemList.get(i);
+			List<File> fileList = item.getFiles();
+			for (int j = 0; j < fileList.size(); j++) {
+				Path file = Paths.get(targetDir + item.getItemId() + "_" + fileList.get(j).getFileId() + ".txt");
+				try {
+					Files.write(file, fileList.get(j).getText().getBytes());
+				} catch (IOException ioException) {
+					ioException.printStackTrace();
+				}
 			}
 		}
 	}

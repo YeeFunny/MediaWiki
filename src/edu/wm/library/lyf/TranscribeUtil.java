@@ -4,10 +4,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 public class TranscribeUtil {
 	
@@ -15,17 +15,19 @@ public class TranscribeUtil {
 	private Connection conn = null;
 	private PreparedStatement preparedStatement = null;
 	private ResultSet resultSet = null;
-	
+
 	private List<Item> itemList;
 	private List<File> fileList;
 	private Item item;
 	private File file;
 	
+	private String text;
+	
 	public TranscribeUtil () {
 		this.mysqlUtil = new MysqlUtil();
 	}
 	
-	private List<Item> getItemHavingFileEntry () {
+	public List<Item> getItemHavingFileEntry () {
 		itemList = new ArrayList<Item>();
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
@@ -51,7 +53,6 @@ public class TranscribeUtil {
 					item = new Item(resultSet.getInt(1));
 					fileList = new ArrayList<File>();;
 				}
-				
 				fileList.add(file);
 			}
 		} catch (SQLException sqlException) {
@@ -62,6 +63,65 @@ public class TranscribeUtil {
 		return itemList;
 	}
 	
+	public List<Item> getItemEntry () {
+		itemList = new ArrayList<Item>();
+		conn = mysqlUtil.getConnection("transcribe");
+		try {
+			preparedStatement = conn
+					.prepareStatement("select e.record_id as item_id, f.id as file_id, e.text as text " + 
+									  "from element_texts e inner join files f on e.record_id = f.item_id " +
+									  "where e.element_id = '86' and e.record_type = 'item' and e.record_id != '3'" + 
+									  "and character_length(e.text) >= 500;");
+			resultSet = preparedStatement.executeQuery();
+			
+			while (resultSet.next()) {
+				item = new Item(resultSet.getInt(1));
+				fileList = new ArrayList<File>();
+				file = new File(resultSet.getInt(2));
+				file.setText(resultSet.getString(3).trim());
+				fileList.add(file);
+				item.setFiles(fileList);
+				itemList.add(item);
+			}
+		} catch (SQLException sqlException) {
+			sqlException.printStackTrace();
+		} finally {
+			mysqlUtil.close();
+		}
+		return itemList;
+	}
+	
+	public String concatenateFileTranscription (List<File> fileEntry) {
+		text = "";
+		Collections.sort(fileEntry, new Comparator<File>() {
+			public int compare (File f1, File f2) {
+				return f1.getFileId() - f2.getFileId();
+			}
+		});
+		for (int i = 0; i < fileEntry.size(); i++) {
+			text = text + "\n" + fileEntry.get(i).getText();
+		}
+		return text.trim();
+	}
+	
+	public String getItemTranscription (int itemId) {
+		text = ""; 
+		conn = mysqlUtil.getConnection("transcribe");
+		try {
+			preparedStatement = conn
+					.prepareStatement("select text from element_texts where record_id = ? and element_id = '86' and record_type = 'Item';");
+			preparedStatement.setInt(1, itemId);
+			resultSet = preparedStatement.executeQuery();
+			while (resultSet.next())
+				text = resultSet.getString("text").trim();
+		} catch (SQLException sqlException) {
+			sqlException.printStackTrace();
+		} finally {
+			mysqlUtil.close();
+		}
+		return text;
+	}
+
 	private List<Integer> getFileIdsOfItem (int itemId) {
 		List<Integer> fileIds = new ArrayList<Integer>();
 		conn = mysqlUtil.getConnection("transcribe");
@@ -79,12 +139,10 @@ public class TranscribeUtil {
 		return fileIds;
 	}
 	
-	public void justTest() {
-		itemList = getItemHavingFileEntry();
-		Iterator<Item> iterator = itemList.iterator();
+	public List<Item> getItemHavingFileNumMatch (List<Item> fileEntry) {
+		Iterator<Item> iterator = fileEntry.iterator();
 		while (iterator.hasNext()) {
 			item = iterator.next();
-			System.out.print(item.getItemId() + "|");
 			List<Integer> fileIds = getFileIdsOfItem(item.getItemId());
 			for (int i = 0; i < fileIds.size(); i++) {
 				file = new File(fileIds.get(i));
@@ -94,75 +152,67 @@ public class TranscribeUtil {
 				}
 			}
 		}
-		System.out.println("---------------------------------------------");
-		for (int i = 0; i < itemList.size(); i++) {
-			System.out.print(itemList.get(i).getItemId() + "|");
-		}
+		return fileEntry;
 	}
 	
-	public Map<String, String> getTextContentOfItem () {
-		Map<String, String> recordText = new HashMap<String, String>();
+	public int insertItemTranscription (Item entry) {
+		int elementId = 1;
+		text = "";
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
-			preparedStatement = conn
-					.prepareStatement("select a.record_id as item_id, b.id as file_id, a.text as text " + 
-									  "from element_texts a inner join files b on a.record_id = b.item_id " +
-									  "where a.element_id = '86' and a.record_type = 'item' and a.record_id != '3'" + 
-									  "and character_length(a.text) >= 500;");
-			resultSet = preparedStatement.executeQuery();
-			
-			while (resultSet.next())
-				recordText.put(resultSet.getInt("item_id") + "_" + resultSet.getInt("file_id")
-					, resultSet.getString("text").trim());
-			
+			fileList = entry.getFiles();
+			text = concatenateFileTranscription(fileList);
+			if (text.length() >= 500)
+				elementId = 86;
+			preparedStatement = conn.prepareStatement("insert into element_texts (record_id, record_type, element_id, html, text)" + 
+													  "values (?, 'Item', ?, 0, ?);");
+			preparedStatement.setInt(1, entry.getItemId());
+			preparedStatement.setInt(2, elementId);
+			preparedStatement.setString(3, text);
+			preparedStatement.executeUpdate();
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
 		} finally {
 			mysqlUtil.close();
 		}
-		return recordText;
+		return elementId;
 	}
 	
-	private boolean checkFileEntry (int fileId) {
-		boolean fileEntryExist = false;
-		try {
-			preparedStatement = conn.
-					prepareStatement("select record_id from element_texts where record_id = ? and element_id = '86' " +
-									 "and record_type = 'File';");
-			preparedStatement.setInt(1, fileId);
-			resultSet = preparedStatement.executeQuery();
-			if (resultSet.next())
-				fileEntryExist = true;
-		} catch (SQLException sqlException) {
-			sqlException.printStackTrace();
-		}
-		
-		return fileEntryExist;
-	}
-	
-	public void updateFileTranscription (Map<String, String> queryResult) {
+	public void insertFileTranscription (List<Item> itemEntry) {
 		conn = mysqlUtil.getConnection("transcribe");
 		try {
-			for (Map.Entry<String, String> entry : queryResult.entrySet()) {
-				int fileId = Integer.valueOf(entry.getKey().substring(entry.getKey().indexOf("_")+1));
-				String text = entry.getValue();
-				if (checkFileEntry(fileId)) {
-					preparedStatement = conn.prepareStatement("update element_texts set text = ? where record_id = ? and element_id = '86' " +
-															  "and record_type = 'File';");
-					preparedStatement.setString(1, text);
-					preparedStatement.setInt(2, fileId);
-				} else {
-					preparedStatement = conn.prepareStatement("insert into element_texts (record_id, record_type, element_id, html, text) "+
-							  "values (?, 'File', 86, 1, ?);");
-					preparedStatement.setInt(1, fileId);
-					preparedStatement.setString(2, text);
+			for (int i = 0; i < itemEntry.size(); i++) {
+				item = itemEntry.get(i);
+				fileList = item.getFiles();
+				for (int j = 0; j < fileList.size(); j++) {
+					preparedStatement = conn.prepareStatement("insert into element_texts (record_id, record_type, element_id, html, text)" + 
+															  "values (?, 'File', 86, 0, ?);");
+					preparedStatement.setInt(1, fileList.get(j).getFileId());
+					preparedStatement.setString(2, fileList.get(j).getText());
+					preparedStatement.executeUpdate();
 				}
-				preparedStatement.execute();
 			}			
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
 		} finally {
 			mysqlUtil.close();
+		}
+	}
+	
+	public void updateFileTranscription (List<File> fileEntry, String itemText) {
+		conn = mysqlUtil.getConnection("transcribe");
+		for (int i = 0; i < fileEntry.size(); i++) {
+			try {
+				preparedStatement = conn
+						.prepareStatement("update element_texts set text = ? where record_id = ? and record_type = 'File' and element_id = '86';");
+				preparedStatement.setString(1, itemText);
+				preparedStatement.setInt(2, fileEntry.get(i).getFileId());
+				preparedStatement.executeUpdate();
+			} catch (SQLException sqlException) {
+				sqlException.printStackTrace();
+			} finally {
+				mysqlUtil.close();
+			}
 		}
 	}
 }
