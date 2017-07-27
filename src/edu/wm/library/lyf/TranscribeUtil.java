@@ -27,6 +27,10 @@ public class TranscribeUtil {
 		this.mysqlUtil = new MysqlUtil();
 	}
 	
+	/**
+	 * Get items which have file transcriptions 
+	 * @return
+	 */
 	public List<Item> getItemHavingFileEntry () {
 		itemList = new ArrayList<Item>();
 		conn = mysqlUtil.getConnection("transcribe");
@@ -41,11 +45,6 @@ public class TranscribeUtil {
 				if (item == null) {
 					item = new Item(resultSet.getInt(1));
 					fileList = new ArrayList<File>();
-				} else if (resultSet.isLast()) {
-					fileList.add(file);
-					item.setFiles(fileList);
-					itemList.add(item);
-					break;
 				}
 				if (item.getItemId() != resultSet.getInt(1)) {
 					item.setFiles(fileList);
@@ -54,6 +53,11 @@ public class TranscribeUtil {
 					fileList = new ArrayList<File>();;
 				}
 				fileList.add(file);
+				if (resultSet.isLast()) {
+					item.setFiles(fileList);
+					itemList.add(item);
+					break;
+				}
 			}
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();
@@ -63,6 +67,10 @@ public class TranscribeUtil {
 		return itemList;
 	}
 	
+	/**
+	 * List items whose item transcription's length is greater than 500
+	 * @return
+	 */
 	public List<Item> getItemEntry () {
 		itemList = new ArrayList<Item>();
 		conn = mysqlUtil.getConnection("transcribe");
@@ -71,17 +79,28 @@ public class TranscribeUtil {
 					.prepareStatement("select e.record_id as item_id, f.id as file_id, e.text as text " + 
 									  "from element_texts e inner join files f on e.record_id = f.item_id " +
 									  "where e.element_id = '86' and e.record_type = 'item' and e.record_id != '3'" + 
-									  "and character_length(e.text) >= 500;");
+									  "and character_length(e.text) >= 500 order by e.record_id;");
 			resultSet = preparedStatement.executeQuery();
 			
 			while (resultSet.next()) {
-				item = new Item(resultSet.getInt(1));
-				fileList = new ArrayList<File>();
 				file = new File(resultSet.getInt(2));
 				file.setText(resultSet.getString(3).trim());
+				if (item == null) {
+					item = new Item(resultSet.getInt(1));
+					fileList = new ArrayList<File>();
+				}
+				if (item.getItemId() != resultSet.getInt(1)) {
+					item.setFiles(fileList);
+					itemList.add(item);
+					item = new Item(resultSet.getInt(1));
+					fileList = new ArrayList<File>();;
+				}
 				fileList.add(file);
-				item.setFiles(fileList);
-				itemList.add(item);
+				if (resultSet.isLast()) {
+					item.setFiles(fileList);
+					itemList.add(item);
+					break;
+				}
 			}
 		} catch (SQLException sqlException) {
 			sqlException.printStackTrace();

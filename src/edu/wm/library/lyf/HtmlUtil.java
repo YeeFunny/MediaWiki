@@ -18,7 +18,7 @@ public class HtmlUtil {
 		while (matcher.find()) {
 			text = matcher.replaceAll("<br />");
 		}
-		text = escapeQuoteSpace(text);
+		text = escapeSpace(text);
 		return text;
 	}
 	
@@ -26,8 +26,9 @@ public class HtmlUtil {
 		for (int i = 0; i < itemList.size(); i++) {
 			Item item = itemList.get(i);
 			List<File> fileList = item.getFiles();
+			(new java.io.File(targetDir + "/" + item.getItemId())).mkdir();
 			for (int j = 0; j < fileList.size(); j++) {
-				Path file = Paths.get(targetDir + item.getItemId() + "_" + fileList.get(j).getFileId() + ".txt");
+				Path file = Paths.get(targetDir + "/" + item.getItemId() + "/" + fileList.get(j).getFileId() + ".txt");
 				try {
 					Files.write(file, fileList.get(j).getText().getBytes());
 				} catch (IOException ioException) {
@@ -37,7 +38,7 @@ public class HtmlUtil {
 		}
 	}
 	
-	private String escapeQuoteSpace (String entry) {
+	private String escapeSpace (String entry) {
 		String[] quotes = {"\"", "'"};
 		for (String quote: quotes) {
 			if (entry.contains(quote))

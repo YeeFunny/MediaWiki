@@ -14,14 +14,15 @@ public class ExportHtmlFile {
 		
 		// List all items having file transcription entries
 		List<Item> fileEntry = transcribeUtil.getItemHavingFileEntry();
-		
+
 		// List all item transcription entries
 		List<Item> itemEntry = transcribeUtil.getItemEntry();
+		
 		// Remove all item having file transcription entries
 		itemEntry.removeAll(fileEntry);
 		transcribeUtil.insertFileTranscription(itemEntry);
 		
-		// List all items having file number matching, last should be logged
+		// List all items having file number matching, last has been logged
 		fileEntry = transcribeUtil.getItemHavingFileNumMatch(fileEntry);
 		
 		String fileText;
@@ -67,6 +68,7 @@ public class ExportHtmlFile {
 			item.setFiles(newFileList);
 			escapsedItemEntry.add(item);
 		}
+		
 		htmlUtil.exportHtmlFile(escapsedItemEntry, targetDir);
 	}
 }
